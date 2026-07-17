@@ -44,7 +44,7 @@ gvi https://github.com/foo/bar/issues/5                 # opens octo://…/issue
 gvi                                                     # same, from the URL on your clipboard
 
 gcd --dry-run <arg>   # show how an argument resolves, do nothing
-gcd --print   <arg>   # print the "open" command (used by the clipboard widget)
+gcd --print   <arg>   # print the "gcd … && $EDITOR …" open command (for scripts)
 gcd --prune           # remove the current repo's ./.worktrees/*
 ```
 
@@ -103,14 +103,24 @@ checkout isn't on and you have uncommitted changes:
 - `worktree` — check the ref out in `./.worktrees/<ref>` and `cd` there. The worktree is reused across invocations; run `gcd --prune` to remove them. Add `.worktrees/` to your global gitignore so it stays invisible.
 - `stash` — `git stash -u`, check out the ref, and remind you to `git stash pop`.
 
-## The `gvi` clipboard widget (zsh)
+## Clipboard & pasting URLs
 
-`gvi` with no arguments reads the URL from your clipboard. For an even faster
-flow you can wire it into a zsh abbreviation/magic-space so typing `gvi␣` expands
-in place to the resolved command — `gcd ~/Code/foo/bar && nvim +42 app/x.rb` —
-which you can eyeball and edit before running. `gcd --print <url>` emits exactly
-that line; point your expander at it. See `abbreviations.zsh` in
-[ericboehs/dotfiles](https://github.com/ericboehs/dotfiles) for a working example.
+`gvi` (and `gcd`) with no arguments read the URL from your clipboard, so the
+fast path is: copy a GitHub link, type `gvi␣⏎`.
+
+If you type the URL out instead, quote it — a GitHub `#L42` / `#diff-…`
+fragment looks like a shell comment (especially with zsh `interactivecomments`),
+so an unquoted paste silently drops everything after the `#`. In zsh you can make
+`gvi␣` expand to `gvi "|"` (cursor between the quotes) with a one-liner in your
+magic-abbrev/space widget:
+
+```zsh
+[[ $MATCH == gvi && -z $command ]] && (( $+functions[gvi] )) && command='gvi "__CURSOR__"'
+```
+
+See `abbreviations.zsh` in
+[ericboehs/dotfiles](https://github.com/ericboehs/dotfiles) for the surrounding
+widget.
 
 Opening PRs/issues uses [octo.nvim](https://github.com/pwntester/octo.nvim)
 buffers (`octo://<host>/<org>/<repo>/pull/<n>`).
