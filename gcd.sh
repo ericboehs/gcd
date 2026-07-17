@@ -222,7 +222,7 @@ _gcd_open() {
     issues) "$ed" "octo://$host/$org/$repo/issues/$num" ;;
     blob)   f=${_GCD_FILE:-$subpath}
             if [ -n "$line" ]; then "$ed" "+$line" -- "$f"; else "$ed" -- "$f"; fi ;;
-    *)      "$ed" . ;;
+    *)      "$ed" ;;   # repo root, no file: open the editor without a dir arg (no explorer)
   esac
 }
 
@@ -235,7 +235,7 @@ _gcd_emit() {
     issues) printf 'gcd %s && %s octo://%s/%s/%s/issues/%s\n' "$d" "$ed" "$host" "$org" "$repo" "$num" ;;
     blob)   if [ -n "$line" ]; then printf 'gcd %s && %s +%s %s\n' "$d" "$ed" "$line" "$subpath"
             else printf 'gcd %s && %s %s\n' "$d" "$ed" "$subpath"; fi ;;
-    *)      printf 'gcd %s && %s .\n' "$d" "$ed" ;;
+    *)      printf 'gcd %s && %s\n' "$d" "$ed" ;;
   esac
 }
 
