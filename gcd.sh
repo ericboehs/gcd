@@ -28,6 +28,13 @@ _gcd_clip() {
 # ---- display helper: /Users/me/... -> ~/... --------------------------------
 _gcd_disp() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
 
+# ---- sha256 of stdin -> bare hex (GitHub diff anchors hash the file path) ---
+_gcd_sha256() {
+  if command -v shasum >/dev/null 2>&1; then shasum -a 256 | cut -d' ' -f1
+  elif command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1
+  fi
+}
+
 # ---- default host (URL host > cwd-derived > GCD_HOST > GH_HOST > github.com)
 _gcd_default_host() {
   [ -n "${ZSH_VERSION:-}" ] && emulate -L sh
@@ -42,21 +49,34 @@ _gcd_default_host() {
   printf '%s' "${GCD_HOST:-${GH_HOST:-github.com}}"
 }
 
-# ---- parse one argument into 8 newline-separated fields --------------------
-# host / org / repo / kind / ref / path / line / num
+# ---- parse one argument into 10 newline-separated fields -------------------
+# host / org / repo / kind / ref / path / line / num / diffhash / side
 _gcd_resolve() {
   [ -n "${ZSH_VERSION:-}" ] && emulate -L sh
   local input=$1 root frag base line first host org repo sub kind ref subpath num
+  local diffhash="" side="" sidepart linepart
 
   root=${GCD_ROOT:-$HOME/Code}
 
-  # fragment (#L42 / #L42-L50) -> line
+  # fragment (#L42 / #L42-L50 / #diff-<sha256>R28 / #diff-<sha256>L28) -> line
   case "$input" in
     *\#*) frag=${input##*#}; base=${input%%#*} ;;
     *)    frag="";           base=$input ;;
   esac
   line=""
-  case "$frag" in L[0-9]*) line=${frag#L}; line=${line%%-*} ;; esac
+  case "$frag" in
+    diff-*)
+      # GitHub diff anchor: diff-<sha256(path)><L|R><line>[-<L|R><line>]
+      # hash is lowercase hex; the side marker is the first upper-case L/R.
+      sidepart=${frag#diff-}
+      diffhash=${sidepart%%[LR]*}          # hex before first L/R
+      sidepart=${sidepart#"$diffhash"}     # e.g. "R28-R30"
+      side=${sidepart%%[0-9]*}             # "R" (chars before first digit)
+      linepart=${sidepart#"$side"}         # "28-R30"
+      line=${linepart%%[!0-9]*}            # "28"
+      ;;
+    L[0-9]*) line=${frag#L}; line=${line%%-*} ;;
+  esac
 
   # strip protocol, query, scp-ish prefix, trailing slash / .git
   base=${base#https://}; base=${base#http://}; base=${base#git://}; base=${base#ssh://}
@@ -100,7 +120,7 @@ _gcd_resolve() {
     esac
   fi
 
-  printf '%s\n' "$host" "$org" "$repo" "$kind" "$ref" "$subpath" "$line" "$num"
+  printf '%s\n' "$host" "$org" "$repo" "$kind" "$ref" "$subpath" "$line" "$num" "$diffhash" "$side"
 }
 
 # ---- clone -----------------------------------------------------------------
@@ -214,9 +234,38 @@ _gcd_pr_checkout() {
   GH_HOST="$host" gh pr checkout "https://$host/$org/$repo/pull/$n"
 }
 
+# ---- resolve a diff anchor's file via gh -----------------------------------
+# GitHub hashes the *file path* into the anchor, so reverse it by hashing each
+# changed path and matching. Uses gh (remote API) — no local checkout needed.
+_gcd_diff_file() {
+  command -v gh >/dev/null 2>&1 || return 1
+  local api filter f h
+  case "$kind" in
+    pull)   api="repos/$org/$repo/pulls/$num/files"; filter='.[].filename' ;;
+    commit) api="repos/$org/$repo/commits/$ref";     filter='.files[].filename' ;;
+    *)      return 1 ;;
+  esac
+  GH_HOST="$host" gh api --paginate "$api" --jq "$filter" 2>/dev/null | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    h=$(printf '%s' "$f" | _gcd_sha256)
+    if [ "$h" = "$diffhash" ]; then printf '%s\n' "$f"; break; fi
+  done
+}
+
 # ---- open in editor --------------------------------------------------------
 _gcd_open() {
   local ed=${EDITOR:-vi} f
+  if [ -n "$diffhash" ]; then
+    f=$(_gcd_diff_file)
+    if [ -n "$f" ]; then
+      [ "$side" = L ] && printf 'gcd: %s#L%s is a base-side (L) line; opening the checked-out version\n' "$f" "$line" >&2
+      if [ -n "$line" ]; then "$ed" "+$line" -- "$f"; else "$ed" -- "$f"; fi
+    else
+      printf 'gcd: could not resolve diff file for %s (opening editor)\n' "$diffhash" >&2
+      "$ed"
+    fi
+    return
+  fi
   case "$kind" in
     pull)   "$ed" "octo://$host/$org/$repo/pull/$num" ;;
     issues) "$ed" "octo://$host/$org/$repo/issues/$num" ;;
@@ -229,6 +278,10 @@ _gcd_open() {
 # ---- emit the open command (used by the gvi clipboard widget) --------------
 _gcd_emit() {
   local ed=${EDITOR:-vi} d
+  # Diff anchors need a gh lookup (and a PR/commit checkout) to resolve the
+  # file — too heavy for a keypress-time expansion, so emit a runnable gvi that
+  # does the real work when you press enter.
+  if [ -n "$diffhash" ]; then printf 'gvi %s\n' "$url"; return 0; fi
   d=$(_gcd_disp "$dir")
   case "$kind" in
     pull)   printf 'gcd %s && %s octo://%s/%s/%s/pull/%s\n'   "$d" "$ed" "$host" "$org" "$repo" "$num" ;;
@@ -290,10 +343,11 @@ gcd() {
 
   [ "$#" -eq 0 ] && { _gcd_help; return 2; }
 
-  local root=${GCD_ROOT:-$HOME/Code}
-  local host org repo kind ref subpath line num _GCD_FILE=""
+  local root=${GCD_ROOT:-$HOME/Code} url=$1
+  local host org repo kind ref subpath line num diffhash side _GCD_FILE=""
   { IFS= read -r host; IFS= read -r org; IFS= read -r repo; IFS= read -r kind
     IFS= read -r ref;  IFS= read -r subpath; IFS= read -r line; IFS= read -r num
+    IFS= read -r diffhash; IFS= read -r side
   } <<EOF
 $(_gcd_resolve "$1")
 EOF
@@ -307,6 +361,7 @@ EOF
   if [ "$dry" = 1 ]; then
     printf 'dir : %s\nrepo: %s/%s/%s\nkind: %s  ref: %s  path: %s  line: %s  num: %s\n' \
       "$(_gcd_disp "$dir")" "$host" "$org" "$repo" "$kind" "${ref:-–}" "${subpath:-–}" "${line:-–}" "${num:-–}"
+    [ -n "$diffhash" ] && printf 'diff: %s  side: %s\n' "$diffhash" "${side:-–}"
     return 0
   fi
 
@@ -318,7 +373,15 @@ EOF
   cd "$dir" || return 1
 
   case "$kind" in
-    pull)              [ "$do_open" = 1 ] || _gcd_pr_checkout "$num" ;;  # gvi: view only, don't switch branch
+    pull)
+      # gvi <pull> is view-only (octo), but a diff line means "take me to that
+      # code", so check out the PR head first so the file exists at that version.
+      if [ "$do_open" = 1 ]; then
+        [ -n "$diffhash" ] && _gcd_pr_checkout "$num"
+      else
+        _gcd_pr_checkout "$num"
+      fi
+      ;;
     issues)            : ;;
     repo)              _gcd_default_checkout ;;
     tree|blob|commit)  [ -n "$ref" ] && _gcd_checkout "$ref" "$subpath" ;;

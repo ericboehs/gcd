@@ -39,6 +39,7 @@ gcd https://github.com/foo/bar/pull/123      # cd + `gh pr checkout 123` (switch
 
 gvi https://github.com/foo/bar/blob/main/app/x.rb#L42   # gcd, then `nvim +42 app/x.rb`
 gvi https://github.com/foo/bar/pull/123                 # opens octo://…/pull/123 (view only, no checkout)
+gvi https://github.com/foo/bar/pull/123/files#diff-<h>R28  # checkout PR head, open that file at line 28
 gvi https://github.com/foo/bar/issues/5                 # opens octo://…/issues/5
 gvi                                                     # same, from the URL on your clipboard
 
@@ -56,6 +57,20 @@ missing).
 
 - URL with a ref (`/tree/<branch>`, `/blob/<branch>/…`, `/commit/<sha>`) → that ref, when the tree is clean (otherwise `GCD_DIRTY` decides).
 - URL with **no** ref (a plain repo link, `host/org/repo`, or bare `org/repo`) → the repo's **default branch** (origin's HEAD), but only when the tree is clean and you aren't already on it. If the tree is dirty, `gcd` just cd's and leaves your branch alone.
+
+### Diff links with a selected line
+
+A GitHub diff link points at a file by *hashing its path* into the anchor
+(`#diff-<sha256(path)><L|R><line>`), so there's no filename in the URL. `gvi`
+resolves it by asking `gh` for the changed files and matching the hash:
+
+- `.../pull/<n>/files#diff-<hash>R28` → check out the PR head, open that file at line 28 (**R** = the new/right side, so the line numbers match the checked-out file).
+- `.../pull/<n>/files#diff-<hash>L40` → **L** is the base/left side; `gvi` still opens the file at that line on the checked-out head and prints a note that the line is base-relative.
+- `.../commit/<sha>#diff-<hash>R7` → check out the commit (detached) and open the file at line 7.
+
+This path needs [`gh`](https://cli.github.com/) (it's a remote lookup). `gcd`
+(without `gvi`) on a diff link just checks out the PR/commit — the file/line
+only matters when there's an editor to open.
 
 ### Branch names with slashes
 
