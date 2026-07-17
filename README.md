@@ -105,17 +105,18 @@ checkout isn't on and you have uncommitted changes:
 
 ## Clipboard & pasting URLs
 
-`gvi` (and `gcd`) with no arguments read the URL from your clipboard, so the
-fast path is: copy a GitHub link, type `gvi␣⏎`.
+`gvi` with no arguments reads the URL from your clipboard, so the fast path is:
+copy a GitHub link, type `gvi␣⏎`. (`gcd` needs an explicit argument — with none
+it just prints help.)
 
-If you type the URL out instead, quote it — a GitHub `#L42` / `#diff-…`
-fragment looks like a shell comment (especially with zsh `interactivecomments`),
-so an unquoted paste silently drops everything after the `#`. In zsh you can make
-`gvi␣` expand to `gvi "|"` (cursor between the quotes) with a one-liner in your
-magic-abbrev/space widget:
+If you pass the URL instead, quote it — a GitHub `#L42` / `#diff-…` fragment
+looks like a shell comment (especially with zsh `interactivecomments`), so an
+unquoted paste silently drops everything after the `#`. In zsh you can make
+`gcd␣` / `gvi␣` expand to `cmd "|"` (cursor between the quotes) with a one-liner
+in your magic-abbrev/space widget:
 
 ```zsh
-[[ $MATCH == gvi && -z $command ]] && (( $+functions[gvi] )) && command='gvi "__CURSOR__"'
+[[ $MATCH == (gcd|gvi) && -z $command ]] && (( $+functions[$MATCH] )) && command="$MATCH \"__CURSOR__\""
 ```
 
 See `abbreviations.zsh` in
