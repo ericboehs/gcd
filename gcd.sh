@@ -26,7 +26,7 @@ _gcd_clip() {
 }
 
 # ---- display helper: /Users/me/... -> ~/... --------------------------------
-_gcd_disp() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
+_gcd_disp() { local h=${HOME%/}; case "$1" in "$h"/*) printf '~%s' "${1#"$h"}" ;; *) printf '%s' "$1" ;; esac; }
 
 # ---- sha256 of stdin -> bare hex (GitHub diff anchors hash the file path) ---
 _gcd_sha256() {
@@ -38,7 +38,10 @@ _gcd_sha256() {
 # ---- default host (URL host > cwd-derived > GCD_HOST > GH_HOST > github.com)
 _gcd_default_host() {
   [ -n "${ZSH_VERSION:-}" ] && emulate -L sh
-  local root=${GCD_ROOT:-$HOME/Code} cwd=$PWD relc h
+  # $HOME can carry a trailing slash on some systems; normalize so the $root
+  # prefix match against $PWD (always single-slash) doesn't silently miss.
+  local root=${GCD_ROOT:-${HOME%/}/Code} cwd=$PWD relc h
+  root=${root%/}
   case "$cwd" in
     "$root"/*)
       relc=${cwd#"$root"/}
@@ -56,7 +59,7 @@ _gcd_resolve() {
   local input=$1 root frag base line first host org repo sub kind ref subpath num
   local diffhash="" side="" sidepart linepart
 
-  root=${GCD_ROOT:-$HOME/Code}
+  root=${GCD_ROOT:-${HOME%/}/Code}; root=${root%/}
 
   # fragment (#L42 / #L42-L50 / #diff-<sha256>R28 / #diff-<sha256>L28) -> line
   case "$input" in
@@ -350,7 +353,7 @@ gcd() {
     esac
   fi
 
-  local root=${GCD_ROOT:-$HOME/Code} url=$1
+  local root=${GCD_ROOT:-${HOME%/}/Code} url=$1; root=${root%/}
   local host org repo kind ref subpath line num diffhash side _GCD_FILE=""
   { IFS= read -r host; IFS= read -r org; IFS= read -r repo; IFS= read -r kind
     IFS= read -r ref;  IFS= read -r subpath; IFS= read -r line; IFS= read -r num
