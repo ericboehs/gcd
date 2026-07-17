@@ -35,9 +35,10 @@ gcd github.com/foo/bar                       # host/org/repo
 gcd foo/bar                                  # bare org/repo (uses default host)
 gcd https://github.com/foo/bar/tree/topic    # cd + checkout branch "topic"
 gcd https://github.com/foo/bar/commit/<sha>  # cd + checkout commit (detached)
-gcd https://github.com/foo/bar/pull/123      # cd + `gh pr checkout 123`
+gcd https://github.com/foo/bar/pull/123      # cd + `gh pr checkout 123` (switch to the PR branch)
 
 gvi https://github.com/foo/bar/blob/main/app/x.rb#L42   # gcd, then `nvim +42 app/x.rb`
+gvi https://github.com/foo/bar/pull/123                 # opens octo://…/pull/123 (view only, no checkout)
 gvi https://github.com/foo/bar/issues/5                 # opens octo://…/issues/5
 gvi                                                     # same, from the URL on your clipboard
 

@@ -318,7 +318,7 @@ EOF
   cd "$dir" || return 1
 
   case "$kind" in
-    pull)              _gcd_pr_checkout "$num" ;;
+    pull)              [ "$do_open" = 1 ] || _gcd_pr_checkout "$num" ;;  # gvi: view only, don't switch branch
     issues)            : ;;
     repo)              _gcd_default_checkout ;;
     tree|blob|commit)  [ -n "$ref" ] && _gcd_checkout "$ref" "$subpath" ;;
