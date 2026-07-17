@@ -341,7 +341,14 @@ gcd() {
     shift
   done
 
-  [ "$#" -eq 0 ] && { _gcd_help; return 2; }
+  # no argument: fall back to a URL/repo ref on the clipboard, else show help
+  if [ "$#" -eq 0 ]; then
+    local clip; clip=$(_gcd_clip)
+    case "$clip" in
+      *://*|*/*) set -- "$clip" ;;
+      *)         _gcd_help; return 2 ;;
+    esac
+  fi
 
   local root=${GCD_ROOT:-$HOME/Code} url=$1
   local host org repo kind ref subpath line num diffhash side _GCD_FILE=""
