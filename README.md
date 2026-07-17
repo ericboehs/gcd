@@ -106,7 +106,7 @@ checkout isn't on and you have uncommitted changes:
 ## Clipboard & pasting URLs
 
 `gvi` with no arguments reads the URL from your clipboard, so the fast path is:
-copy a GitHub link, type `gvi␣⏎`. (`gcd` needs an explicit argument — with none
+copy a GitHub link, type `gvi⏎`. (`gcd` needs an explicit argument — with none
 it just prints help.)
 
 If you pass the URL instead, quote it — a GitHub `#L42` / `#diff-…` fragment
