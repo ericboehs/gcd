@@ -30,7 +30,7 @@ Requires `git`. Cloning uses [`gh`](https://cli.github.com/) when available
 ## Usage
 
 ```sh
-gcd https://github.com/foo/bar               # clone if needed, then cd
+gcd https://github.com/foo/bar               # clone if needed, cd, land on default branch
 gcd github.com/foo/bar                       # host/org/repo
 gcd foo/bar                                  # bare org/repo (uses default host)
 gcd https://github.com/foo/bar/tree/topic    # cd + checkout branch "topic"
@@ -50,6 +50,11 @@ Input can be a full URL (with or without protocol), `host/org/repo`,
 bare `org/repo`, an `scp`-style `git@host:org/repo`, or a local path already
 under `$GCD_ROOT` (which reverse-maps back to its remote, so it still clones if
 missing).
+
+### Which ref you land on
+
+- URL with a ref (`/tree/<branch>`, `/blob/<branch>/…`, `/commit/<sha>`) → that ref, when the tree is clean (otherwise `GCD_DIRTY` decides).
+- URL with **no** ref (a plain repo link, `host/org/repo`, or bare `org/repo`) → the repo's **default branch** (origin's HEAD), but only when the tree is clean and you aren't already on it. If the tree is dirty, `gcd` just cd's and leaves your branch alone.
 
 ### Branch names with slashes
 

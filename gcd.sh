@@ -141,6 +141,29 @@ _gcd_dirty() {
   esac
 }
 
+# ---- default branch of origin (e.g. main / master) -------------------------
+_gcd_default_branch() {
+  local d
+  d=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+  if [ -z "$d" ]; then
+    git remote set-head origin --auto >/dev/null 2>&1
+    d=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+  fi
+  printf '%s' "${d#origin/}"
+}
+
+# ---- no ref in the URL: land on the default branch if the tree is clean -----
+_gcd_default_checkout() {
+  [ -n "$(git status --porcelain 2>/dev/null)" ] && return 0   # dirty: stay put, quietly
+  local def cur
+  def=$(_gcd_default_branch)
+  cur=$(git symbolic-ref --quiet --short HEAD 2>/dev/null)
+  [ -n "$def" ] && [ "$def" != "$cur" ] || return 0
+  if git checkout "$def" >/dev/null 2>&1; then
+    printf 'gcd: checked out default branch %s\n' "$def" >&2
+  fi
+}
+
 # ---- checkout with lazy slashed-branch ref-walk ----------------------------
 _gcd_checkout() {
   local want=$1 tail=$2 cur cand rest seg
@@ -297,6 +320,7 @@ EOF
   case "$kind" in
     pull)              _gcd_pr_checkout "$num" ;;
     issues)            : ;;
+    repo)              _gcd_default_checkout ;;
     tree|blob|commit)  [ -n "$ref" ] && _gcd_checkout "$ref" "$subpath" ;;
   esac
 
