@@ -46,7 +46,7 @@ _gcd_default_host() {
 # host / org / repo / kind / ref / path / line / num
 _gcd_resolve() {
   [ -n "${ZSH_VERSION:-}" ] && emulate -L sh
-  local input=$1 root frag base line first host org repo sub kind ref path num
+  local input=$1 root frag base line first host org repo sub kind ref subpath num
 
   root=${GCD_ROOT:-$HOME/Code}
 
@@ -87,12 +87,12 @@ _gcd_resolve() {
   [ "$#" -ge 2 ] && shift 2 || set --
   repo=${repo%.git}
 
-  kind=repo; ref=""; path=""; num=""
+  kind=repo; ref=""; subpath=""; num=""
   if [ "$#" -gt 0 ]; then
     sub=$1; shift
     case "$sub" in
       tree)         kind=tree;   IFS=/; ref="$*"; unset IFS ;;
-      blob)         kind=blob;   ref=$1; [ "$#" -ge 1 ] && shift; IFS=/; path="$*"; unset IFS ;;
+      blob)         kind=blob;   ref=$1; [ "$#" -ge 1 ] && shift; IFS=/; subpath="$*"; unset IFS ;;
       commit)       kind=commit; ref=$1 ;;
       pull)         kind=pull;   num=$1 ;;
       issues|issue) kind=issues; num=$1 ;;
@@ -100,7 +100,7 @@ _gcd_resolve() {
     esac
   fi
 
-  printf '%s\n' "$host" "$org" "$repo" "$kind" "$ref" "$path" "$line" "$num"
+  printf '%s\n' "$host" "$org" "$repo" "$kind" "$ref" "$subpath" "$line" "$num"
 }
 
 # ---- clone -----------------------------------------------------------------
@@ -195,7 +195,7 @@ _gcd_open() {
   case "$kind" in
     pull)   "$ed" "octo://$host/$org/$repo/pull/$num" ;;
     issues) "$ed" "octo://$host/$org/$repo/issues/$num" ;;
-    blob)   f=${_GCD_FILE:-$path}
+    blob)   f=${_GCD_FILE:-$subpath}
             if [ -n "$line" ]; then "$ed" "+$line" -- "$f"; else "$ed" -- "$f"; fi ;;
     *)      "$ed" . ;;
   esac
@@ -208,8 +208,8 @@ _gcd_emit() {
   case "$kind" in
     pull)   printf 'gcd %s && %s octo://%s/%s/%s/pull/%s\n'   "$d" "$ed" "$host" "$org" "$repo" "$num" ;;
     issues) printf 'gcd %s && %s octo://%s/%s/%s/issues/%s\n' "$d" "$ed" "$host" "$org" "$repo" "$num" ;;
-    blob)   if [ -n "$line" ]; then printf 'gcd %s && %s +%s %s\n' "$d" "$ed" "$line" "$path"
-            else printf 'gcd %s && %s %s\n' "$d" "$ed" "$path"; fi ;;
+    blob)   if [ -n "$line" ]; then printf 'gcd %s && %s +%s %s\n' "$d" "$ed" "$line" "$subpath"
+            else printf 'gcd %s && %s %s\n' "$d" "$ed" "$subpath"; fi ;;
     *)      printf 'gcd %s && %s .\n' "$d" "$ed" ;;
   esac
 }
@@ -266,9 +266,9 @@ gcd() {
   [ "$#" -eq 0 ] && { _gcd_help; return 2; }
 
   local root=${GCD_ROOT:-$HOME/Code}
-  local host org repo kind ref path line num _GCD_FILE=""
+  local host org repo kind ref subpath line num _GCD_FILE=""
   { IFS= read -r host; IFS= read -r org; IFS= read -r repo; IFS= read -r kind
-    IFS= read -r ref;  IFS= read -r path; IFS= read -r line; IFS= read -r num
+    IFS= read -r ref;  IFS= read -r subpath; IFS= read -r line; IFS= read -r num
   } <<EOF
 $(_gcd_resolve "$1")
 EOF
@@ -281,7 +281,7 @@ EOF
 
   if [ "$dry" = 1 ]; then
     printf 'dir : %s\nrepo: %s/%s/%s\nkind: %s  ref: %s  path: %s  line: %s  num: %s\n' \
-      "$(_gcd_disp "$dir")" "$host" "$org" "$repo" "$kind" "${ref:-–}" "${path:-–}" "${line:-–}" "${num:-–}"
+      "$(_gcd_disp "$dir")" "$host" "$org" "$repo" "$kind" "${ref:-–}" "${subpath:-–}" "${line:-–}" "${num:-–}"
     return 0
   fi
 
@@ -295,7 +295,7 @@ EOF
   case "$kind" in
     pull)              _gcd_pr_checkout "$num" ;;
     issues)            : ;;
-    tree|blob|commit)  [ -n "$ref" ] && _gcd_checkout "$ref" "$path" ;;
+    tree|blob|commit)  [ -n "$ref" ] && _gcd_checkout "$ref" "$subpath" ;;
   esac
 
   [ "$do_open" = 1 ] && _gcd_open
