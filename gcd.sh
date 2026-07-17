@@ -186,7 +186,9 @@ _gcd_pr_checkout() {
     git stash push -u -m "gcd: auto-stash before PR $n" >/dev/null 2>&1 \
       && printf 'gcd: stashed changes; restore with: git stash pop\n' >&2
   fi
-  GH_HOST="$host" gh pr checkout "$n"
+  # Pass the full URL so gh resolves the exact repo from the link, not an
+  # ambiguous default remote (e.g. a fork alongside origin).
+  GH_HOST="$host" gh pr checkout "https://$host/$org/$repo/pull/$n"
 }
 
 # ---- open in editor --------------------------------------------------------
